@@ -1,0 +1,42 @@
+:root{font-family:"Microsoft YaHei",system-ui,-apple-system,sans-serif;color:#f8fafc;background:#1e2935;font-size:15px}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;background:radial-gradient(circle at 85% 8%,#6d7188 0,transparent 33%),radial-gradient(circle at 10% 80%,#476275 0,transparent 38%),linear-gradient(150deg,#1b2b3c,#303544 62%,#1c2732)}
+button,input,select,textarea{font:inherit}
+button{cursor:pointer;border:1px solid rgba(255,255,255,.16);border-radius:12px;background:rgba(255,255,255,.09);color:#f8fafc;padding:9px 13px}
+button:hover{background:rgba(255,255,255,.16)}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid #9bd5ff;outline-offset:2px}
+button.primary{background:#e6f3fa;color:#213349;border-color:transparent;font-weight:700}
+button.primary:hover{background:#fff}
+h1,h2,h3,p{margin:0}
+h1{font-size:1.55rem;line-height:1.2}
+h2{font-size:1.3rem}
+h3{font-size:1rem}
+.app{max-width:720px;margin:0 auto;padding:24px 18px 48px}
+.topbar,.month-header,.day-heading,.button-row{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.topbar{margin-bottom:24px}
+.eyebrow{font-size:.67rem;letter-spacing:.22em;color:#bdcbd6;font-weight:700;margin-bottom:5px}
+.icon-button{font-size:1.3rem;min-width:44px;height:44px;padding:4px}
+.panel{background:rgba(255,255,255,.095);border:1px solid rgba(255,255,255,.16);box-shadow:0 12px 50px rgba(0,0,0,.13);border-radius:22px;padding:20px;backdrop-filter:blur(14px);margin-bottom:16px}
+.muted{color:#c8d0d9;line-height:1.6;margin:10px 0 16px}
+.stack{display:grid;gap:14px;margin-top:18px}
+.stack label{display:grid;gap:6px;font-size:.9rem;color:#d8e2e9}
+.stack input,.stack select,.stack textarea{width:100%;padding:11px 12px;border:1px solid rgba(255,255,255,.24);border-radius:11px;background:rgba(17,30,43,.7);color:#fff;min-width:0}
+.stack input::placeholder,.stack textarea::placeholder{color:#9aaab8}
+.button-row{justify-content:flex-end;margin-top:3px}
+.button-row button{min-width:88px}
+.month-controls{display:flex;gap:5px;align-items:center}.month-controls button{padding:6px 11px;min-width:33px}
+.weekdays,.month-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.weekdays{margin-top:18px;margin-bottom:6px;text-align:center;color:#c8d0d9;font-size:.78rem}
+.month-grid button{min-height:55px;padding:7px 3px;background:rgba(0,0,0,.14);border-color:rgba(255,255,255,.09);border-radius:10px;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:5px}
+.month-grid button.outside{opacity:.4}.month-grid button.selected{background:rgba(255,255,255,.26);border-color:rgba(255,255,255,.47)}.month-grid button.today .number{background:#e6f3fa;color:#273b4d;border-radius:50%;min-width:24px}
+.number{font-weight:700;font-size:.85rem;line-height:24px}.dots{display:flex;gap:3px;min-height:6px}.dot{width:5px;height:5px;border-radius:50%;background:#fff}.dot.course{background:#93d5fa}.dot.todo{background:#f6d99a}.dot.schedule{background:#f9a9b9}
+.day-section{padding:14px 1px}.day-heading{margin-bottom:18px}.day-heading h2{font-size:1.2rem}
+.group{margin-bottom:22px}.group h3{color:#d8e7f1;margin-bottom:10px}.group .empty{color:#aab8c4;padding:5px 2px;font-size:.9rem}
+.item{display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.095);border:1px solid rgba(255,255,255,.12);border-radius:13px;padding:10px 11px;margin-bottom:7px;min-height:58px}
+.item-main{flex:1;min-width:0}.item-title{font-weight:600;overflow-wrap:anywhere}.item-meta{font-size:.78rem;color:#c5d4df;margin-top:4px;overflow-wrap:anywhere}
+.item-actions{display:flex;gap:4px}.item-actions button{font-size:.82rem;padding:6px 8px;white-space:nowrap}
+.status{min-height:24px;color:#cdd8e0;font-size:.83rem;padding:3px}.status.error{color:#ffb3b3}
+dialog{border:1px solid rgba(255,255,255,.2);border-radius:20px;padding:24px;background:#2c3948;color:white;width:min(520px,calc(100vw - 28px));max-height:calc(100vh - 30px);overflow:auto;box-shadow:0 30px 100px rgba(0,0,0,.45)}
+dialog::backdrop{background:rgba(0,0,0,.62);backdrop-filter:blur(4px)}.time-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+[hidden]{display:none!important}
+@media(max-width:480px){.app{padding:20px 12px 32px}.panel{padding:16px;border-radius:18px}.month-grid button{min-height:48px}.topbar{margin-bottom:18px}.month-header h2{font-size:1.12rem}.month-controls button{padding:5px 8px}.item-actions{flex-direction:column}.item-actions button{font-size:.75rem}}

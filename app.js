@@ -134,14 +134,14 @@ async function loadItems() {
   try {
     let items = await fetchItems();
     if (await maintainRemote(items)) items = await fetchItems();
-    if (state.session !== session && state.session?.user_id !== session?.user_id) return;
+    if (!state.session || userCacheKey() !== userCacheKey(session)) return;
     state.items = items;
     state.offline = false;
     const key = userCacheKey();
     if (key) localStorage.setItem(key, JSON.stringify(items));
     showStatus(`已同步 · ${new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}`);
   } catch (error) {
-    if (state.session !== session && state.session?.user_id !== session?.user_id) return;
+    if (!state.session || userCacheKey() !== userCacheKey(session)) return;
     const key = userCacheKey();
     state.items = key ? JSON.parse(localStorage.getItem(key) || '[]') : [];
     state.offline = true;

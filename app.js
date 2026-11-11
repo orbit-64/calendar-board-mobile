@@ -2,6 +2,7 @@ const $ = (id) => document.getElementById(id);
 const configKey = 'calendar-board-config-v1';
 const sessionKey = 'calendar-board-session-v1';
 const cacheKey = 'calendar-board-cache-v1';
+const userCachePrefix = 'calendar-board-cache-v2-';
 const defaultConfig = {
   url: 'https://wnxfmendphwaiujllpag.supabase.co',
   key: 'sb_publishable_lnUN_5q2iYUR8C5MXODnXw_XlpgW-4R',
@@ -15,6 +16,7 @@ const state = {
   selected: localDate(new Date()),
   editing: null,
 };
+localStorage.removeItem(cacheKey); // Discard the old cache that was shared across accounts.
 
 function localDate(date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
@@ -32,11 +34,31 @@ function setPanel(name) {
   $('authPanel').hidden = name !== 'auth';
   $('calendarApp').hidden = name !== 'app';
 }
+function tokenUserId(token) {
+  try {
+    const encoded = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    return JSON.parse(atob(encoded)).sub || null;
+  } catch { return null; }
+}
+function userCacheKey(session = state.session) {
+  const userId = session?.user_id || tokenUserId(session?.access_token || '');
+  return userId ? `${userCachePrefix}${userId}` : null;
+}
+function clearLocalAccount() {
+  const key = userCacheKey();
+  if (key) localStorage.removeItem(key);
+  localStorage.removeItem(cacheKey); // Remove the old cache shared by every account.
+  localStorage.removeItem(sessionKey);
+  state.session = null;
+  state.items = [];
+  state.offline = false;
+}
 function saveSession(data) {
   state.session = {
     access_token: data.access_token,
     refresh_token: data.refresh_token,
     expires_at: data.expires_at || Math.floor(Date.now() / 1000) + (data.expires_in || 3600),
+    user_id: data.user?.id || tokenUserId(data.access_token),
   };
   localStorage.setItem(sessionKey, JSON.stringify(state.session));
 }
@@ -108,15 +130,20 @@ async function maintainRemote(items) {
   return changed;
 }
 async function loadItems() {
+  const session = state.session;
   try {
     let items = await fetchItems();
     if (await maintainRemote(items)) items = await fetchItems();
+    if (state.session !== session && state.session?.user_id !== session?.user_id) return;
     state.items = items;
     state.offline = false;
-    localStorage.setItem(cacheKey, JSON.stringify(items));
+    const key = userCacheKey();
+    if (key) localStorage.setItem(key, JSON.stringify(items));
     showStatus(`已同步 · ${new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}`);
   } catch (error) {
-    state.items = JSON.parse(localStorage.getItem(cacheKey) || '[]');
+    if (state.session !== session && state.session?.user_id !== session?.user_id) return;
+    const key = userCacheKey();
+    state.items = key ? JSON.parse(localStorage.getItem(key) || '[]') : [];
     state.offline = true;
     showStatus(`${error.message} 正显示上次保存的内容；离线时不能编辑。`, true);
   }
@@ -267,8 +294,7 @@ $('setupForm').addEventListener('submit', (event) => {
   }
   state.config = { url, key };
   localStorage.setItem(configKey, JSON.stringify(state.config));
-  state.session = null;
-  localStorage.removeItem(sessionKey);
+  clearLocalAccount();
   setPanel('auth');
   showStatus('连接信息已保存。请登录日历账号。');
 });
@@ -278,6 +304,7 @@ $('authForm').addEventListener('submit', async (event) => {
     const data = await rawRequest('/auth/v1/token?grant_type=password', {
       method: 'POST', body: { email: $('email').value.trim(), password: $('password').value },
     });
+    localStorage.removeItem(cacheKey);
     saveSession(data);
     $('password').value = '';
     setPanel('app');
@@ -298,8 +325,7 @@ $('signupButton').addEventListener('click', async () => {
 });
 $('settingsButton').addEventListener('click', () => {
   if (!confirm('退出当前登录并重新填写连接信息？')) return;
-  state.session = null;
-  localStorage.removeItem(sessionKey);
+  clearLocalAccount();
   setPanel('setup');
   showStatus('已退出登录。');
 });

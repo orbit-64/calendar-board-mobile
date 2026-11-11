@@ -285,6 +285,10 @@ $('authForm').addEventListener('submit', async (event) => {
   } catch (error) { showStatus(error.message, true); }
 });
 $('signupButton').addEventListener('click', async () => {
+  if (!$('authForm').reportValidity() || $('password').value.length < 6) {
+    showStatus('请先填写有效邮箱和至少 6 位密码。', true);
+    return;
+  }
   try {
     await rawRequest('/auth/v1/signup', {
       method: 'POST', body: { email: $('email').value.trim(), password: $('password').value },

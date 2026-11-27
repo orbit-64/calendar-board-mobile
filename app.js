@@ -15,6 +15,7 @@ const state = {
   view: new Date(),
   selected: localDate(new Date()),
   editing: null,
+  history: false,
 };
 localStorage.removeItem(cacheKey); // Discard the old cache that was shared across accounts.
 
@@ -104,26 +105,33 @@ async function fetchItems() {
   const all = [];
   let offset = 0;
   while (true) {
-    const rows = await api(`/rest/v1/calendar_items?select=id,payload&order=id.asc&limit=1000&offset=${offset}`);
+    const rows = await api(`/rest/v1/calendar_items?select=id,payload,version,status,deleted_at&order=id.asc&limit=1000&offset=${offset}`);
     all.push(...rows);
     if (rows.length < 1000) break;
     offset += rows.length;
   }
-  return all.map((row) => ({ ...row.payload, id: row.id })).filter((item) => item.id && item.date);
+  return all.map((row) => ({ ...row.payload, id: row.id, _version: row.version,
+    _status: row.status, _deleted: row.deleted_at })).filter((item) => item.id && item.date);
+}
+async function writeItem(item, status = 'active', deleted = false) {
+  const { _version, _status, _deleted, ...payload } = item;
+  return api('/rest/v1/rpc/calendar_save', { method: 'POST', body: {
+    p_id: item.id, p_expected: _version ?? null, p_payload: payload,
+    p_status: status, p_deleted: deleted,
+  }});
 }
 async function maintainRemote(items) {
   const today = localDate(new Date());
   let changed = false;
   for (const item of items) {
+    if (item._status !== 'active' || item._deleted) continue;
     if (item.date >= today) continue;
     if (item.type === '待办' && !item.done) {
       const updated = { ...item, date: today };
-      await api(`/rest/v1/calendar_items?id=eq.${encodeURIComponent(item.id)}`, {
-        method: 'PATCH', body: { payload: updated },
-      });
+      await writeItem(updated);
       changed = true;
     } else if (item.type === '日程') {
-      await api(`/rest/v1/calendar_items?id=eq.${encodeURIComponent(item.id)}`, { method: 'DELETE' });
+      await writeItem(item, 'archived');
       changed = true;
     }
   }
@@ -177,7 +185,7 @@ function renderCalendar() {
     if (iso === state.selected) button.classList.add('selected');
     button.append(make('span', 'number', String(date.getDate())));
     const dots = make('span', 'dots');
-    const dayItems = state.items.filter((item) => item.date === iso);
+    const dayItems = state.items.filter((item) => item.date === iso && item._status === 'active' && !item._deleted);
     for (const type of ['课程', '待办', '日程']) {
       if (dayItems.some((item) => item.type === type)) {
         dots.append(make('span', `dot ${{ 课程: 'course', 待办: 'todo', 日程: 'schedule' }[type]}`));
@@ -193,6 +201,7 @@ function renderCalendar() {
   }
 }
 function renderDay() {
+  if (state.history) { renderHistory(); return; }
   const date = parseDate(state.selected);
   const weekdays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
   $('dayTitle').textContent = `${date.getMonth() + 1}月${date.getDate()}日 · ${weekdays[date.getDay()]}`;
@@ -201,7 +210,7 @@ function renderDay() {
   for (const type of ['课程', '待办', '日程']) {
     const group = make('section', 'group');
     group.append(make('h3', '', type));
-    const items = state.items.filter((item) => item.date === state.selected && item.type === type)
+    const items = state.items.filter((item) => item.date === state.selected && item.type === type && item._status === 'active' && !item._deleted)
       .sort((a, b) => (a.time || '').localeCompare(b.time || '') || a.title.localeCompare(b.title, 'zh-CN'));
     if (!items.length) group.append(make('p', 'empty', `这天没有${type}`));
     for (const item of items) {
@@ -223,6 +232,29 @@ function renderDay() {
       group.append(row);
     }
     container.append(group);
+  }
+}
+function renderHistory() {
+  $('dayTitle').textContent = '历史 / 已完成 / 回收站';
+  const container = $('dayItems'); container.replaceChildren();
+  const items = state.items.filter(item => item._status !== 'active' || item._deleted)
+    .sort((a,b) => b.date.localeCompare(a.date));
+  if (!items.length) container.append(make('p', 'empty', '暂无历史记录'));
+  for (const item of items) {
+    const row = make('div','item');
+    const content = make('div','item-main');
+    content.append(make('div','item-title',item.title));
+    content.append(make('div','item-meta',`${item.date} · ${item.type} · ${item._deleted ? '已删除' : item._status === 'completed' ? '已完成' : '已归档'}`));
+    row.append(content);
+    const restore = make('button','','恢复'); restore.type='button'; restore.disabled=state.offline;
+    restore.addEventListener('click', async () => {
+      if (!confirm('恢复该事项？过去的日程将恢复到今天，避免立即再次归档。')) return;
+      const restored = {...item, done:false};
+      if ((item.type === '日程' || item.type === '待办') && item.date < localDate(new Date())) restored.date=localDate(new Date());
+      try { await writeItem(restored); await loadItems(); }
+      catch(error) { showStatus(error.message,true); }
+    });
+    row.append(restore); container.append(row);
   }
 }
 function render() {
@@ -262,13 +294,7 @@ async function saveEntry(event) {
   if ('room' in item) item.room = item.place;
   if ('display' in item) item.display = item.title;
   try {
-    if (state.editing) {
-      await api(`/rest/v1/calendar_items?id=eq.${encodeURIComponent(id)}`, {
-        method: 'PATCH', body: { payload: item },
-      });
-    } else {
-      await api('/rest/v1/calendar_items', { method: 'POST', body: { id, payload: item } });
-    }
+    await writeItem(item);
     $('entryDialog').close();
     state.selected = item.date;
     state.view = parseDate(item.date);
@@ -277,9 +303,9 @@ async function saveEntry(event) {
 }
 async function deleteEntry(item) {
   if (state.offline) { showStatus('离线时不能删除。', true); return; }
-  if (!confirm(item.type === '待办' ? `完成并删除「${item.title}」？` : `删除「${item.title}」？`)) return;
+  if (!confirm(item.type === '待办' ? `完成「${item.title}」？可在历史中恢复。` : `将「${item.title}」移入回收站？`)) return;
   try {
-    await api(`/rest/v1/calendar_items?id=eq.${encodeURIComponent(item.id)}`, { method: 'DELETE' });
+    await writeItem({...item,done:item.type === '待办'}, item.type === '待办' ? 'completed' : 'archived', item.type !== '待办');
     await loadItems();
   } catch (error) { showStatus(error.message, true); }
 }
@@ -333,6 +359,10 @@ $('prevMonth').addEventListener('click', () => { state.view = new Date(state.vie
 $('nextMonth').addEventListener('click', () => { state.view = new Date(state.view.getFullYear(), state.view.getMonth() + 1, 1); render(); });
 $('todayButton').addEventListener('click', () => { state.view = new Date(); state.selected = localDate(new Date()); render(); });
 $('addButton').addEventListener('click', () => openEntry());
+$('historyButton').addEventListener('click', () => {
+  state.history=!state.history;
+  $('historyButton').textContent=state.history ? '返回当天' : '历史 / 回收站'; render();
+});
 $('cancelEntry').addEventListener('click', () => $('entryDialog').close());
 $('entryForm').addEventListener('submit', saveEntry);
 

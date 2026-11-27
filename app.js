@@ -120,28 +120,10 @@ async function writeItem(item, status = 'active', deleted = false) {
     p_status: status, p_deleted: deleted,
   }});
 }
-async function maintainRemote(items) {
-  const today = localDate(new Date());
-  let changed = false;
-  for (const item of items) {
-    if (item._status !== 'active' || item._deleted) continue;
-    if (item.date >= today) continue;
-    if (item.type === '待办' && !item.done) {
-      const updated = { ...item, date: today };
-      await writeItem(updated);
-      changed = true;
-    } else if (item.type === '日程') {
-      await writeItem(item, 'archived');
-      changed = true;
-    }
-  }
-  return changed;
-}
 async function loadItems() {
   const session = state.session;
   try {
-    let items = await fetchItems();
-    if (await maintainRemote(items)) items = await fetchItems();
+    const items = await fetchItems();
     if (!state.session || userCacheKey() !== userCacheKey(session)) return;
     state.items = items;
     state.offline = false;
@@ -384,3 +366,4 @@ if (new URLSearchParams(location.search).has('demo')) {
   else setPanel('auth');
 } else setPanel('setup');
 setInterval(() => { if (state.config && state.session && !document.hidden) loadItems(); }, 5 * 60 * 1000);
+

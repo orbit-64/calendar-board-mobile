@@ -1,0 +1,45 @@
+课表日历：每日维护迁移云端（2026-11-27）
+
+规则：北京时间每日 00:05；旧的未完成待办顺延至当天，过去的有效日程标记 archived。
+课程、未来日程、已完成待办、已删除或已归档记录不处理。不永久删除历史。
+每天的处理结果会在其他设备下一次同步时显示，不改变设备同步间隔。
+当前安卓 v2.2 已兼容，不需要重新安装 APK。
+
+实现：
+- calendar_private.maintain_daily(date) 为私有、调用者权限函数，普通账号无法执行。
+- 默认日期固定使用 Asia/Shanghai，不依赖数据库或客户端时区。
+- PostgreSQL 行锁和原有 version 触发器负责并发协调，旧版本编辑会提示冲突。
+- 事务级咨询锁防止维护任务互相重叠；重复运行不会重复改变事项。
+- 无效旧日期跳过，避免单条损坏数据中断整个任务。
+- Cron 命令设置锁等待 5 秒、执行 30 秒上限；失败可在 cron.job_run_details 查询。
+- 每次成功的处理数量记录在 calendar_private.maintenance_runs。
+
+部署文件：
+backend/002-maintenance-core.sql：建立私有维护函数与日志表，在事务中执行。
+tests/maintenance-rollback.sql：数据库事务测试，自动 ROLLBACK，不留下测试事项。
+backend/003-enable-cron.sql：先建立私有数据快照，再启用任务并立即补跑一次。
+backend/004-monitor.sql：管理员检查任务与执行日志。
+web/app.js：移除加载时顺延和归档，继续使用原有版本校验接口编辑。
+web/index.html：脚本 URL 添加新版本参数。
+windows/Render.ps1：不再调用本地数据维护；保留现有布局、时钟、日期跟随和滑出交互。
+windows/Maintain.ps1：旧快捷入口的只读兼容脚本，不再修改 events.json。
+
+调度：Supabase Cron 使用 GMT，表达式 5 16 * * * 对应北京时间次日 00:05。
+管理员停用任务可执行：
+select cron.alter_job((select jobid from cron.job where jobname='calendar-daily-maintenance'), active := false);
+停用后需手工排查及补跑，或恢复旧客户端维护逻辑；不要直接删除表、历史或备份。
+保留 pg_cron 扩展，避免影响项目中的其他任务。
+
+备份位于数据库 calendar_private.calendar_items_before_cloud_maintenance，启用 RLS 并撤销普通账号访问。
+Windows 原脚本备份仅留在本机工作目录 backup-local-private，未包含进公开源码包。
+源码包不包含 events.json、登录凭证或账号文件。
+
+验证：
+- 数据库：10 类样本（含缺省 done、当天、未来、课程、已完成、软删除、无效日期）及重复运行通过。
+- 北京时间跨午夜边界、私有权限、维护后的旧版本写入拒绝通过。
+- 所有数据库测试事务已回滚；原有 172 条记录与私有快照数量一致。
+- 真实 Cron 临时验证任务执行 succeeded，验证后自行撤销；正式每日任务保持启用。
+- 网页只读加载、账号缓存隔离和退出登录竞争检查通过。
+- Windows PowerShell 5.1 渲染测试通过，渲染前后 events.json 字节未改变。
+
+Supabase 项目停机或服务不可用时，云端任务不能执行；可查看执行日志并在恢复后管理员补跑。

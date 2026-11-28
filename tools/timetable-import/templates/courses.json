@@ -1,0 +1,8 @@
+{
+  "semester_start": "2027-03-01",
+  "total_weeks": 20,
+  "courses": [
+    {"title": "示例高等数学", "weekday": 1, "start_period": 1, "end_period": 2, "start_week": 1, "end_week": 18, "week_pattern": "all", "place": "示例楼A101"},
+    {"title": "示例实验课", "weekday": 4, "start_time": "14:30", "end_time": "16:05", "weeks": "3-6;9;12-14", "week_pattern": "all", "place": "示例实验室"}
+  ]
+}

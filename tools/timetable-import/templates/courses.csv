@@ -1,0 +1,4 @@
+title,weekday,start_time,end_time,start_week,end_week,week_pattern,place
+示例高等数学,1,08:30,10:05,1,18,all,示例楼A101
+示例英语,3,10:20,11:55,1,18,odd,示例楼B202
+示例体育,5,14:30,16:05,2,18,even,示例操场
